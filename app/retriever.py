@@ -1,74 +1,44 @@
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
 import json
-
-# load embedding model
-print("Loading model...")
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
-
-print("Model loaded!")
 
 # load catalog
 with open("catalog_detailed.json", "r", encoding="utf-8") as f:
-    catalog = json.load(f)
+    products = json.load(f)
 
-print(f"Loaded {len(catalog)} products")
+print(f"Loaded {len(products)} products")
 
-# combine text for embeddings
-texts = []
 
-for item in catalog:
-
-    combined_text = (
-        item["name"] + " " + item["description"]
-    )
-
-    texts.append(combined_text)
-
-print("Creating embeddings...")
-
-embeddings = model.encode(texts)
-
-print("Embeddings created!")
-
-# create FAISS index
-dimension = embeddings.shape[1]
-
-index = faiss.IndexFlatL2(dimension)
-
-index.add(np.array(embeddings))
-
-print("FAISS index created!")
-
-# semantic search function
 def search(query, k=5):
 
-    query_embedding = model.encode([query])
+    query_words = query.lower().split()
 
-    distances, indices = index.search(
-        np.array(query_embedding),
-        k
+    scored_results = []
+
+    for product in products:
+
+        score = 0
+
+        text = (
+            product["name"] + " " +
+            product["description"]
+        ).lower()
+
+        for word in query_words:
+
+            if word in text:
+                score += 1
+
+        if score > 0:
+
+            scored_results.append((score, product))
+
+    scored_results.sort(
+        key=lambda x: x[0],
+        reverse=True
     )
 
-    results = []
-
-    for i in indices[0]:
-        results.append(catalog[i])
+    results = [
+        item[1]
+        for item in scored_results[:k]
+    ]
 
     return results
-
-# test query
-query = "Hiring Java backend developer"
-
-print(f"\nQUERY: {query}\n")
-
-results = search(query)
-
-print("SEARCH RESULTS:\n")
-
-for result in results:
-    print(result["name"])
-    print(result["url"])
-    print("=" * 50)
